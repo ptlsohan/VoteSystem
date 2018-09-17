@@ -6,34 +6,58 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class VotingService {
 	Motion m=null;
-	HashMap<Boolean,Integer> result=new HashMap<>();
+	ConcurrentHashMap<Boolean,Integer> result=new ConcurrentHashMap<>();
+	ExecutorService service= Executors.newCachedThreadPool();
 	Set<Integer> voterSet = new HashSet<>();
 
 	public void createMotion(String name) {
 		 m = new Motion(name);
 	}
-	public void openVoting() {
+	public String getState() {
+		return m.getMotionState();
+	}
+	public boolean openVoting()  {
+		if(m.getMotionState()!="Created") {
+			System.out.println("Motion not available");
+			return false;
+		}
 		result.put(true, 0);
 		result.put(false, 0);
 		m.setMotionState("Opened");
 		m.setOpenTime(LocalDateTime.now());
-		while(true) {
-		
-			int choice = getInput();
+		return true;
+			
+	}
+	
+	public boolean submitVote() throws InterruptedException, ExecutionException {
+		if(m.getMotionState()!="Opened") {
+			System.out.println("Motion is not open for voting");
+			return false;
+		}
+			Future<Integer> future = service.submit(()->{
+				return getInput();
+			}) ;
+			int choice = future.get();
 			if(choice==1) {
 				result.put(true, result.get(true)+1);
+				
 			}else if(choice ==0) {
 				result.put(false, result.get(false)+1);
 			}
-			if(voterSet.size()==101) {
-				break;
+			if(voterSet.size()==3) {
+				return false;
 			}
-		}
-				
+		return true;
 	}
+	
 	public void closeVoting() {
 		LocalDateTime time = LocalDateTime.now();
 		long diff=m.getOpenTime().until(time,ChronoUnit.MINUTES);
